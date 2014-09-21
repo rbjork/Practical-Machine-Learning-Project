@@ -5,14 +5,14 @@ date: "Sunday, September 21, 2014"
 output: html_document
 ---
 
-Background (from Coursera "Prediction Assignment Writeup" webpage):
+### Background (from Coursera "Prediction Assignment Writeup" webpage):
 
 Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
 
 Goal (from Coursera "Prediction Assignment Writeup" webpage):
 The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases.
 
-Load Data:
+### Load Data:
 ```{r}
 library(caret)
 trainfile <- "pml-training.csv";
@@ -28,7 +28,7 @@ useableFeatureData <- data[,colindexes]
 useableFeatureData$classe <- data$classe
 ```
 
-Partitioning the data into Training, Crossvalidation and final test for out of sample error estimate.
+### Partitioning the data into Training, Crossvalidation and final test for out of sample error estimate.
 ```{r}
 indexes <- createDataPartition(useableFeatureData$classe, p=.80,list=FALSE)
 trainAndCrossValidateData <- useableFeatureData[indexes,]
@@ -39,11 +39,11 @@ crossIndexs <- createDataPartition(trainAndCrossValidateData$classe, p=.25,list=
 trainData <- trainAndCrossValidateData[-crossIndexs,]
 crossData <- trainAndCrossValidateData[crossIndexs,]
 ```
-MOdel Selection:
 
 
 
-Exploratory Analysis:
+
+### Exploratory Analysis:
 
 ```{r}
 # Look at number of samples in each classe group
@@ -73,7 +73,7 @@ M[53,-53]
 max(M[53,-53])
 ```
 As can be seen above, no single feature is strongly correlated with 'classe'. The most correlation is 34% with 'pitch_forearm'.
-Also, all features with the "magnet" name prefixed have correlations above 20%
+
 ```{r}
   indexpitchforearm <- grep("pitch_forearm",trainData)
   plot(trainData$classe,trainData$pitch_forearm,ylab="Pitch_forearm",xlab="classe",main="Coorelation between pitch_forearm and classe")
@@ -119,8 +119,8 @@ if(badCol){
 trainData_stdz$classe <- trainData$classe
 ```
 
-MODELING
-Features examinations for possible compression of data:
+
+### Features examinations for possible compression of data:
 ```{r}
 M <- abs(cor(trainData_stdz[,-grep("classe",names(trainData_stdz))]))
 diag(M) <- 0
@@ -133,7 +133,10 @@ prComp <- prcomp(dataforpc)
 classeType <- trainData_stdz$classe
 
 plot(prComp$x[,1],prComp$x[,2],col=classeType,xlab="PC1",ylab="PC2")
-# Notice the grouping but still there is no seperation ; 2 components far too few
+```
+Notice the grouping but still there is no seperation ; 2 components far too few.
+
+```{r}
 summary(prComp)
 
 plot(prComp$sdev)
@@ -141,71 +144,77 @@ plot(prComp$sdev)
 ```
 Clearly there are many PCA vectors that contribute. It isn't clear whether using PCA to compress the number of features to fit is worthwhile. And it could reduce interpetablity of the eventual model.
 
-Fitting a Model:
-```{r}
 
-# Decision Tree
-# In order to resolve classe c, 5 levels was required. This is likely overfitted particularily 
-# for c
+## Model Selection:
+
+Fitting a Model:
+
+
+
+### Decision Tree
+
+In order to resolve classe c, 5 levels was required. This is likely overfitted particularily 
+for c
+
+```{r}
 
 treeTrainData <- trainData
 set.seed(3344)
-decisionTreeModel <- train(classe ~.,method="rpart",tuneLength=4,data=treeTrainData)
+decisionTreeModel <- train(classe ~.,method="rpart",tuneLength=5,data=treeTrainData)
 print(decisionTreeModel$finalModel)
 
 plot(decisionTreeModel$finalModel,uniform=TRUE,main="Decision Tree for classe")
 text(decisionTreeModel$finalModel, use.n=TRUE,all=TRUE,cex=.8)
 ```
-Insample error:
+
+Insample error calculation:
 ```{r}
 indexClasse <- grep("classe",names(treeTrainData))
 predictions <- predict(decisionTreeModel,newdata=treeTrainData[,-indexClasse])
-confusionMatrix(predictions,treeTrainData$classe)
-# In sample Accuracy 63%
+cm <- confusionMatrix(predictions,treeTrainData$classe)
+cm
+
 ```
+
+In sample Accuracy `r cm$overall[1]` or`r 1 - cm$overall[1]` error
+
 Out of sample error via cross validation:
 ```{r}
 indexClasse <- grep("classe",names(crossData))
 predictions <- predict(decisionTreeModel,newdata=crossData[,-indexClasse])
-confusionMatrix(predictions,crossData$classe)
-# Out of sample accuracy of 61 percent
+cm <- confusionMatrix(predictions,crossData$classe)
+cm
+```
+Out of sample accuracy `r cm$overall[1]` or`r 1 - cm$overall[1]` error
 
+### Decision Tree with PCA preprocess
+```{r}
 set.seed(3344)
-decisionTreeModel <- train(classe ~.,method="rpart", preProcess="pca", tuneLength=4, data=treeTrainData)
+decisionTreeModel <- train(classe ~.,method="rpart", preProcess="pca", tuneLength=5, data=treeTrainData)
 print(decisionTreeModel$finalModel)
 plot(decisionTreeModel$finalModel,uniform=TRUE,main="Decision Tree for classe")
 text(decisionTreeModel$finalModel, use.n=TRUE,all=TRUE,cex=.8)
 indexClasse <- grep("classe",names(treeTrainData))
 predictions <- predict(decisionTreeModel,newdata=treeTrainData[,-indexClasse])
-confusionMatrix(predictions,treeTrainData$classe)
-# In sample Accuracy of 43.1% 5 deep
+cm <- confusionMatrix(predictions,treeTrainData$classe)
+cm
+```
+
+In sample accuracy `r cm$overall[1]` or `r 1 - cm$overall[1]` error
+
+
+```{r}
+# In sample Accuracy of 40% 5 deep - 60% error
 indexClasse <- grep("classe",names(crossData))
 predictions <- predict(decisionTreeModel,newdata=crossData[,-indexClasse])
-confusionMatrix(predictions,crossData$classe)
-# In sample Accuracy of 40.9% 5 deep
+cm <- confusionMatrix(predictions,crossData$classe)
+cm
 
+```
+Out of sample accuracy `r cm$overall[1]` or `r 1 - cm$overall[1]` error
 
-# # Boosting
-# set.seed(3344)
-# fitControl <- trainControl(method="repeatedcv",number=5,repeats=5)
-# boostTreeModel <- train(classe ~., method="gbm",trControl=fitControl, verbose=FALSE,data=treeTrainData)
-# print(boostTreeModel)
-# plot(boostTreeModel$finalModel,uniform=TRUE,main="Decision Tree for classe")
-# text(boostTreeModel$finalModel, use.n=TRUE,all=TRUE,cex=.8)
-# indexClasse <- grep("classe",names(treeTrainData))
-# predictions <- predict(boostTreeModel,newdata=treeTrainData[,-indexClasse])
-# confusionMatrix(predictions,treeTrainData$classe)
-# 
-# # Accuracy : 0.9746
-# indexClasse <- grep("classe",names(crossData))
-# predictions <- predict(boostTreeModel,newdata=crossData[,-indexClasse])
-# confusionMatrix(predictions,crossData$classe)
-# # Accuracy : 0.2333
-# 
-# qplot(predict(boostTreeModel,treeTrainData),classe,data=treeTrainData)
-# qplot(predict(boostTreeModel,crossData),classe,data=crossData)
-
-# Randomm Forest 
+### Randomm Forest 
+```{r}
 library(randomForest)
 set.seed(3344)
 #trainData_stdz <- trainData
@@ -213,32 +222,42 @@ indexClasse <- grep("classe",names(trainData))
 rfModel <- randomForest(trainData[,-indexClasse],trainData[,indexClasse],ntree=50,prox=TRUE)
 indexClasse <- grep("classe",names(crossData))
 predictions <- predict(rfModel,crossData[,-indexClasse])
-confusionMatrix(predictions,crossData$classe)
-# 99.5 % accurate out of sample
+cm <- confusionMatrix(predictions,crossData$classe)
+cm
 
-# Linear Discrimanate Analysis
+```
+Out of sample accuracy `r cm$overall[1]` or `r 1 - cm$overall[1]` error
+
+
+### Linear Discrimanate Analysis
+
+```{r}
 set.seed(3344)
 ldaModel <- train(classe ~.,method="lda",data=trainData)
 predictions <- predict(ldaModel,crossData[,-indexClasse])
-confusionMatrix(predictions,crossData$classe)
+cm <- confusionMatrix(predictions,crossData$classe)
+cm
 ```
 
-Linear Discriminate Analysis gives about 69 % percent accuracy
+Linear Discriminate Analysis gives about `r cm$overall[1]` % percent accuracy or `r 1 - cm$overall[1]` error
 
 
-Conclusion:
+## Conclusion:
+
 Clearly "Random Forest" model fits the best. Not very interpetable but that isn't as much of a concern than is accuracy. So we go with
 Random forest. Now that the model has been chosen, we make the final test for out of sample error with a fresh set of data not yet used.
 
-Computing out of sample error:
+### Computing out of sample error:
 ```{r}
 indexClasse <- grep("classe",names(testData))
 predictions <- predict(rfModel,testData[,-indexClasse])
-confusionMatrix(predictions,testData$classe)
+cm <- confusionMatrix(predictions,testData$classe)
+cm
 
 ```
-Get 99.4 percent accuracy
-Or 0.56 percent error out of sample error
+### Get Out of sample accuracy `r cm$overall[1]` or `
+
+### Or `r 1 - cm$overall[1]` out of sample error
 
 
 As can be seen from above the accuracy is '99.4'. Thus out of sample error is '0.56' percent (56 errors of of 10,000 samples).
