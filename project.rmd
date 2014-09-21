@@ -1,0 +1,271 @@
+---
+title: "PML Coursera Project"
+author: "Ronald Bjork"
+date: "Sunday, September 21, 2014"
+output: html_document
+---
+
+Background (from Coursera "Prediction Assignment Writeup" webpage):
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+Goal (from Coursera "Prediction Assignment Writeup" webpage):
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases.
+
+Load Data:
+```{r}
+library(caret)
+trainfile <- "pml-training.csv";
+data <- read.csv(trainfile,stringsAsFactors=TRUE)
+str(data)
+```
+
+Examining the data it can be seen that many of the features(columns in table) have predominately "NA" and a few "#DIV/0". These are generally features that are generated from other features through statistical computations. These can be called summarial statistics that include minumins, maximums, averages, variances, means, skewneww and kurtosis of sets of data. These are computed from the other recorded feature data over chunks of time during a particular activity, "classe". The number of computations are roughly around 400. Because we are working with about 160 features total there is a danger of overfitting. So if these were choosen we might not be very successful. Some thought was to replicate these values to fill all 19800 rows but this was not done since there was sufficient features other than these summarial stats.
+The features(columns) that we used finally was the numeric quantities,"x y and z" components, pertaining to pitch, roll, yaw, as well as acceleration, gyros measurements, totals,and magnetudes. This is a total of 52 features they were extracted as follows:
+```{r}
+colindexes <- grep("^(roll_|pitch_|yaw_|magnet_|total_|gyros_|accel_)",names(data))
+useableFeatureData <- data[,colindexes]
+useableFeatureData$classe <- data$classe
+```
+
+Partitioning the data into Training, Crossvalidation and final test for out of sample error estimate.
+```{r}
+indexes <- createDataPartition(useableFeatureData$classe, p=.80,list=FALSE)
+trainAndCrossValidateData <- useableFeatureData[indexes,]
+# Use only once
+testData <- useableFeatureData[-indexes,] 
+
+crossIndexs <- createDataPartition(trainAndCrossValidateData$classe, p=.25,list=FALSE)
+trainData <- trainAndCrossValidateData[-crossIndexs,]
+crossData <- trainAndCrossValidateData[crossIndexs,]
+```
+MOdel Selection:
+
+
+
+Exploratory Analysis:
+
+```{r}
+# Look at number of samples in each classe group
+table(trainData$classe)
+class(trainData$classe)
+```
+
+Fortunatly  all classe's outcomes have sufficient numbers for fitting.
+Now we look a coorelations:
+```{r}
+
+trainData$clsnumeric <- as.numeric(trainData$classe)
+indexClasse <- grep("classe",names(trainData))
+M <- abs(cor(trainData[,-indexClasse]))
+trainData <- trainData[,-grep("clsnumeric",names(trainData))]
+diag(M) <- 0
+m <- which(M > 0.80, arr.ind=T )
+m
+
+```
+Since their are now strong correlation pairwise and for now we'll retain all 52 features. Perhaps we could 
+reduce by 3 or 4 features,but we'll keep all 52 for now.
+
+Correlations with classe(used clsnumeric)
+```{r}
+M[53,-53]
+max(M[53,-53])
+```
+As can be seen above, no single feature is strongly correlated with 'classe'. The most correlation is 34% with 'pitch_forearm'.
+Also, all features with the "magnet" name prefixed have correlations above 20%
+```{r}
+  indexpitchforearm <- grep("pitch_forearm",trainData)
+  plot(trainData$classe,trainData$pitch_forearm,ylab="Pitch_forearm",xlab="classe",main="Coorelation between pitch_forearm and classe")
+```
+
+Standardization:
+
+```{r}
+# Standardizing
+standardize <- function(d,sdv,mn){
+    if(is.na(d) | is.na(sdv) | sdv == 0){
+      d <- mn
+    }else{
+      d <- as.numeric(d) # in case it isn't, but probably not needed
+      d <- (d - mn)/sdv
+    }
+}
+
+colsThatFailed <- c()
+indexclasse <- grep("classe",names(trainData))
+trainData_stdz <- trainData[,-indexclasse];
+colnumber <- length(colnames(trainData_stdz))
+badCol <- FALSE
+for(col in 1:colnumber){
+  #print(col)
+  coldata <- trainData_stdz[,col]
+  if(is.factor(coldata)){
+    coldata <- as.numeric(coldata)
+  }
+  sdv <- sd(coldata,na.rm=TRUE)
+  mn <- mean(coldata,na.rm=TRUE)
+  if(!is.na(mn)){
+    trainData_stdz[,col] <- sapply(trainData_stdz[,col],standardize,sdv,mn)
+  }else{
+    print(paste("failed to get mean for col", col))
+    colsThatFailed <- c(colsThatFailed,col)
+    badCol = TRUE
+  }
+}
+if(badCol){
+  trainData_stdz <- trainData_stdz[,-colsThatFailed]
+} 
+trainData_stdz$classe <- trainData$classe
+```
+
+MODELING
+Features examinations for possible compression of data:
+```{r}
+M <- abs(cor(trainData_stdz[,-grep("classe",names(trainData_stdz))]))
+diag(M) <- 0
+m <- which(M > 0.95, arr.ind=T )
+m
+
+indexOfclasse <- which(names(trainData_stdz) == "classe")
+dataforpc <- trainData_stdz[,-indexOfclasse]
+prComp <- prcomp(dataforpc)
+classeType <- trainData_stdz$classe
+
+plot(prComp$x[,1],prComp$x[,2],col=classeType,xlab="PC1",ylab="PC2")
+# Notice the grouping but still there is no seperation ; 2 components far too few
+summary(prComp)
+
+plot(prComp$sdev)
+
+```
+Clearly there are many PCA vectors that contribute. It isn't clear whether using PCA to compress the number of features to fit is worthwhile. And it could reduce interpetablity of the eventual model.
+
+Fitting a Model:
+```{r}
+
+# Decision Tree
+# In order to resolve classe c, 5 levels was required. This is likely overfitted particularily 
+# for c
+
+treeTrainData <- trainData
+set.seed(3344)
+decisionTreeModel <- train(classe ~.,method="rpart",tuneLength=6,data=treeTrainData)
+print(decisionTreeModel$finalModel)
+
+plot(decisionTreeModel$finalModel,uniform=TRUE,main="Decision Tree for classe")
+text(decisionTreeModel$finalModel, use.n=TRUE,all=TRUE,cex=.8)
+```
+Insample error:
+```{r}
+indexClasse <- grep("classe",names(treeTrainData))
+predictions <- predict(decisionTreeModel,newdata=treeTrainData[,-indexClasse])
+confusionMatrix(predictions,treeTrainData$classe)
+# In sample Accuracy 63%
+```
+Out of sample error via cross validation:
+```{r}
+indexClasse <- grep("classe",names(crossData))
+predictions <- predict(decisionTreeModel,newdata=crossData[,-indexClasse])
+confusionMatrix(predictions,crossData$classe)
+# Out of sample accuracy of 61 percent
+
+set.seed(3344)
+decisionTreeModel <- train(classe ~.,method="rpart", preProcess="pca", tuneLength=6, data=treeTrainData)
+print(decisionTreeModel$finalModel)
+plot(decisionTreeModel$finalModel,uniform=TRUE,main="Decision Tree for classe")
+text(decisionTreeModel$finalModel, use.n=TRUE,all=TRUE,cex=.8)
+indexClasse <- grep("classe",names(treeTrainData))
+predictions <- predict(decisionTreeModel,newdata=treeTrainData[,-indexClasse])
+confusionMatrix(predictions,treeTrainData$classe)
+# In sample Accuracy of 43.1% 5 deep
+indexClasse <- grep("classe",names(crossData))
+predictions <- predict(decisionTreeModel,newdata=crossData[,-indexClasse])
+confusionMatrix(predictions,crossData$classe)
+# In sample Accuracy of 40.9% 5 deep
+
+
+# # Boosting
+# set.seed(3344)
+# fitControl <- trainControl(method="repeatedcv",number=5,repeats=5)
+# boostTreeModel <- train(classe ~., method="gbm",trControl=fitControl, verbose=FALSE,data=treeTrainData)
+# print(boostTreeModel)
+# plot(boostTreeModel$finalModel,uniform=TRUE,main="Decision Tree for classe")
+# text(boostTreeModel$finalModel, use.n=TRUE,all=TRUE,cex=.8)
+# indexClasse <- grep("classe",names(treeTrainData))
+# predictions <- predict(boostTreeModel,newdata=treeTrainData[,-indexClasse])
+# confusionMatrix(predictions,treeTrainData$classe)
+# 
+# # Accuracy : 0.9746
+# indexClasse <- grep("classe",names(crossData))
+# predictions <- predict(boostTreeModel,newdata=crossData[,-indexClasse])
+# confusionMatrix(predictions,crossData$classe)
+# # Accuracy : 0.2333
+# 
+# qplot(predict(boostTreeModel,treeTrainData),classe,data=treeTrainData)
+# qplot(predict(boostTreeModel,crossData),classe,data=crossData)
+
+# Randomm Forest 
+library(randomForest)
+set.seed(3344)
+#trainData_stdz <- trainData
+indexClasse <- grep("classe",names(trainData))
+rfModel <- randomForest(trainData[,-indexClasse],trainData[,indexClasse],ntree=50,prox=TRUE)
+indexClasse <- grep("classe",names(crossData))
+predictions <- predict(rfModel,crossData[,-indexClasse])
+confusionMatrix(predictions,crossData$classe)
+# 99.5 % accurate out of sample
+
+# Linear Discrimanate Analysis
+set.seed(3344)
+ldaModel <- train(classe ~.,method="lda",data=trainData)
+predictions <- predict(ldaModel,crossData[,-indexClasse])
+confusionMatrix(predictions,crossData$classe)
+```
+
+Linear Discriminate Analysis gives about 69 % percent accuracy
+
+
+Conclusion:
+Clearly "Random Forest" model fits the best. Not very interpetable but that isn't as much of a concern than is accuracy. So we go with
+Random forest. Now that the model has been chosen, we make the final test for out of sample error with a fresh set of data not yet used.
+
+Computing out of sample error:
+```{r}
+indexClasse <- grep("classe",names(testData))
+predictions <- predict(rfModel,testData[,-indexClasse])
+confusionMatrix(predictions,testData$classe)
+
+```
+Get 99.4 percent accuracy
+Or 0.56 percent error out of sample error
+
+
+As can be seen from above the accuracy is '99.4'. Thus out of sample error is '0.56' percent (56 errors of of 10,000 samples).
+
+Now for estimating classe from 'pml-testing.cv':
+```{r}
+testfile <- "pml-testing.csv";
+testdataRaw <- read.csv(testfile,stringsAsFactors=TRUE)
+colindexes <- grep("^(roll_|pitch_|yaw_|magnet_|total_|gyros_|accel_)",names(testdataRaw))
+testdataUse <- testdataRaw[,colindexes]
+testdataUse$problem_id <- testdataRaw$problem_id
+indexProbID <- grep("problem_id",names(testdataUse))
+predictions <- predict(rfModel,testdataUse[,-indexProbID])
+answers <- as.character(predictions)
+answers
+
+# pml_write_files = function(x){
+#   n = length(x)
+#   for(i in 1:n){
+#     filename = paste0("problem_id_",i,".txt")
+#     write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+#   }
+# }
+# 
+# 
+# pml_write_files(answers)
+
+```
+
+
