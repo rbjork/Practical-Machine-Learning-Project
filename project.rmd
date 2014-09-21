@@ -73,7 +73,7 @@ M[53,-53]
 max(M[53,-53])
 ```
 As can be seen above, no single feature is strongly correlated with 'classe'. The most correlation is 34% with 'pitch_forearm'.
-Also, all features with the "magnet" name prefixed have correlations above 20%
+
 ```{r}
   indexpitchforearm <- grep("pitch_forearm",trainData)
   plot(trainData$classe,trainData$pitch_forearm,ylab="Pitch_forearm",xlab="classe",main="Coorelation between pitch_forearm and classe")
@@ -133,7 +133,10 @@ prComp <- prcomp(dataforpc)
 classeType <- trainData_stdz$classe
 
 plot(prComp$x[,1],prComp$x[,2],col=classeType,xlab="PC1",ylab="PC2")
-# Notice the grouping but still there is no seperation ; 2 components far too few
+```
+Notice the grouping but still there is no seperation ; 2 components far too few.
+
+```{r}
 summary(prComp)
 
 plot(prComp$sdev)
@@ -142,20 +145,23 @@ plot(prComp$sdev)
 Clearly there are many PCA vectors that contribute. It isn't clear whether using PCA to compress the number of features to fit is worthwhile. And it could reduce interpetablity of the eventual model.
 
 Fitting a Model:
-```{r}
 
-# Decision Tree
-# In order to resolve classe c, 5 levels was required. This is likely overfitted particularily 
-# for c
+
+Decision Tree
+In order to resolve classe c, 5 levels was required. This is likely overfitted particularily 
+for c
+
+```{r}
 
 treeTrainData <- trainData
 set.seed(3344)
-decisionTreeModel <- train(classe ~.,method="rpart",tuneLength=4,data=treeTrainData)
+decisionTreeModel <- train(classe ~.,method="rpart",tuneLength=5,data=treeTrainData)
 print(decisionTreeModel$finalModel)
 
 plot(decisionTreeModel$finalModel,uniform=TRUE,main="Decision Tree for classe")
 text(decisionTreeModel$finalModel, use.n=TRUE,all=TRUE,cex=.8)
 ```
+
 Insample error:
 ```{r}
 indexClasse <- grep("classe",names(treeTrainData))
@@ -171,7 +177,7 @@ confusionMatrix(predictions,crossData$classe)
 # Out of sample accuracy of 61 percent
 
 set.seed(3344)
-decisionTreeModel <- train(classe ~.,method="rpart", preProcess="pca", tuneLength=4, data=treeTrainData)
+decisionTreeModel <- train(classe ~.,method="rpart", preProcess="pca", tuneLength=5, data=treeTrainData)
 print(decisionTreeModel$finalModel)
 plot(decisionTreeModel$finalModel,uniform=TRUE,main="Decision Tree for classe")
 text(decisionTreeModel$finalModel, use.n=TRUE,all=TRUE,cex=.8)
@@ -204,8 +210,10 @@ confusionMatrix(predictions,crossData$classe)
 # 
 # qplot(predict(boostTreeModel,treeTrainData),classe,data=treeTrainData)
 # qplot(predict(boostTreeModel,crossData),classe,data=crossData)
+```
 
-# Randomm Forest 
+Randomm Forest 
+```{r}
 library(randomForest)
 set.seed(3344)
 #trainData_stdz <- trainData
@@ -215,8 +223,11 @@ indexClasse <- grep("classe",names(crossData))
 predictions <- predict(rfModel,crossData[,-indexClasse])
 confusionMatrix(predictions,crossData$classe)
 # 99.5 % accurate out of sample
+```
 
-# Linear Discrimanate Analysis
+Linear Discrimanate Analysis
+
+```{r}
 set.seed(3344)
 ldaModel <- train(classe ~.,method="lda",data=trainData)
 predictions <- predict(ldaModel,crossData[,-indexClasse])
