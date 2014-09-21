@@ -162,20 +162,25 @@ plot(decisionTreeModel$finalModel,uniform=TRUE,main="Decision Tree for classe")
 text(decisionTreeModel$finalModel, use.n=TRUE,all=TRUE,cex=.8)
 ```
 
-Insample error:
+Insample error calculation:
 ```{r}
 indexClasse <- grep("classe",names(treeTrainData))
 predictions <- predict(decisionTreeModel,newdata=treeTrainData[,-indexClasse])
 confusionMatrix(predictions,treeTrainData$classe)
-# In sample Accuracy 63%
+# In sample Accuracy 54.3% or 45.6% error
 ```
+
 Out of sample error via cross validation:
 ```{r}
 indexClasse <- grep("classe",names(crossData))
 predictions <- predict(decisionTreeModel,newdata=crossData[,-indexClasse])
 confusionMatrix(predictions,crossData$classe)
-# Out of sample accuracy of 61 percent
+```
 
+Out of sample accuracy of 54.1 percent or 45.9%error
+
+
+```{r}
 set.seed(3344)
 decisionTreeModel <- train(classe ~.,method="rpart", preProcess="pca", tuneLength=5, data=treeTrainData)
 print(decisionTreeModel$finalModel)
@@ -184,33 +189,15 @@ text(decisionTreeModel$finalModel, use.n=TRUE,all=TRUE,cex=.8)
 indexClasse <- grep("classe",names(treeTrainData))
 predictions <- predict(decisionTreeModel,newdata=treeTrainData[,-indexClasse])
 confusionMatrix(predictions,treeTrainData$classe)
-# In sample Accuracy of 43.1% 5 deep
+# In sample Accuracy of 40% 5 deep - 60% error
 indexClasse <- grep("classe",names(crossData))
 predictions <- predict(decisionTreeModel,newdata=crossData[,-indexClasse])
 confusionMatrix(predictions,crossData$classe)
-# In sample Accuracy of 40.9% 5 deep
-
-
-# # Boosting
-# set.seed(3344)
-# fitControl <- trainControl(method="repeatedcv",number=5,repeats=5)
-# boostTreeModel <- train(classe ~., method="gbm",trControl=fitControl, verbose=FALSE,data=treeTrainData)
-# print(boostTreeModel)
-# plot(boostTreeModel$finalModel,uniform=TRUE,main="Decision Tree for classe")
-# text(boostTreeModel$finalModel, use.n=TRUE,all=TRUE,cex=.8)
-# indexClasse <- grep("classe",names(treeTrainData))
-# predictions <- predict(boostTreeModel,newdata=treeTrainData[,-indexClasse])
-# confusionMatrix(predictions,treeTrainData$classe)
-# 
-# # Accuracy : 0.9746
-# indexClasse <- grep("classe",names(crossData))
-# predictions <- predict(boostTreeModel,newdata=crossData[,-indexClasse])
-# confusionMatrix(predictions,crossData$classe)
-# # Accuracy : 0.2333
-# 
-# qplot(predict(boostTreeModel,treeTrainData),classe,data=treeTrainData)
-# qplot(predict(boostTreeModel,crossData),classe,data=crossData)
 ```
+In sample Accuracy of 43% 5 deep or 57% error
+In sample Accuracy of 42% 5 deep or 58% error
+
+
 
 Randomm Forest 
 ```{r}
