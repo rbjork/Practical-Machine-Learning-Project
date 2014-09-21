@@ -150,7 +150,7 @@ Fitting a Model:
 
 treeTrainData <- trainData
 set.seed(3344)
-decisionTreeModel <- train(classe ~.,method="rpart",tuneLength=6,data=treeTrainData)
+decisionTreeModel <- train(classe ~.,method="rpart",tuneLength=4,data=treeTrainData)
 print(decisionTreeModel$finalModel)
 
 plot(decisionTreeModel$finalModel,uniform=TRUE,main="Decision Tree for classe")
@@ -171,7 +171,7 @@ confusionMatrix(predictions,crossData$classe)
 # Out of sample accuracy of 61 percent
 
 set.seed(3344)
-decisionTreeModel <- train(classe ~.,method="rpart", preProcess="pca", tuneLength=6, data=treeTrainData)
+decisionTreeModel <- train(classe ~.,method="rpart", preProcess="pca", tuneLength=4, data=treeTrainData)
 print(decisionTreeModel$finalModel)
 plot(decisionTreeModel$finalModel,uniform=TRUE,main="Decision Tree for classe")
 text(decisionTreeModel$finalModel, use.n=TRUE,all=TRUE,cex=.8)
